@@ -16,6 +16,8 @@
 #include <PushButton.h>
 #include <Bounce2.h>
 
+#include "avr/wdt.h"
+
 // define on which pins the buttons are connected
 const int Button_1_pin = 9;    // top left button
 const int Button_2_pin = 14;   // top right button
@@ -75,6 +77,9 @@ boolean mouse_active = 0;
 boolean first_pressed = 1;
 int joy_key_counter = 0;
 
+unsigned long timeNow = 0;
+unsigned long timeWDT = 0;
+
 char STF_key = STF_Vario; 
 
 // Create instances of PushButtons on digital pins
@@ -89,7 +94,22 @@ PushButton Button_3 = PushButton(Button_3_pin, ENABLE_INTERNAL_PULLUP);
 // PushButton Button_4 = PushButton(Button_4_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_button = PushButton(Joy_button_pin, ENABLE_INTERNAL_PULLUP);
 
+void watchdogInit() {                                         
+        timeWDT = timeNow = millis();
+        wdt_reset();
+        WDTCSR |= (1 << WDCE) | (1 << WDE);  // set relevant bits to enter watchdog timer configuration mode
+        WDTCSR = (1<< WDE) | WDTO_2S;        // turn on WatchDog timer
+}
+void wdtReset() {
+    timeNow = millis();
+    if (timeNow - timeWDT >= 450) {  // 2 in 1 second
+        timeWDT = timeNow;
+        wdt_reset();
+    }
+}
+
 void setup() {
+  watchdogInit();
   STF_button.onPress(onSTF_button);
   
   Joy_up.onRelease(onJoyRelease);
@@ -126,6 +146,8 @@ void loop() {
   Joy_down.update();
   Joy_left.update();
   Joy_right.update();
+
+  wdtReset();
 }
 
 void onButtonReleased(Button& btn){
