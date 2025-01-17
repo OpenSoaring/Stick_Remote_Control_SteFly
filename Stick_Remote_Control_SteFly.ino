@@ -103,12 +103,14 @@ void watchdogInit() {
 void wdtReset() {
     timeNow = millis();
     if (timeNow - timeWDT >= 450) {  // 2 in 1 second
+        Serial.println(timeNow);
         timeWDT = timeNow;
         wdt_reset();
     }
 }
 
 void setup() {
+  Serial.begin(9600);
   watchdogInit();
   STF_button.onPress(onSTF_button);
   
@@ -188,7 +190,7 @@ void onJoy(Button& btn){
     if(btn.is(Joy_right)) Keyboard.press(KEY_RIGHT_ARROW);
     Keyboard.releaseAll(); 
   } 
-  joy_key_counter = joy_key_counter +1; 
+  joy_key_counter = joy_key_counter + 1;
   if (first_pressed && joy_key_counter > joy_key_first_pressed_threshold){
     joy_key_counter = 0;
     first_pressed = 0;
