@@ -27,7 +27,7 @@ const int Joy_up_pin = 2;
 const int Joy_down_pin = 4;
 const int Joy_left_pin = 5;
 const int Joy_right_pin = 3;
-const int STF_switch_pin = 7; // STF switch 
+const int STF_button_pin = 7; // STF switch 
 
 // define press (short press) and hold (long press) functions for each button
 // settings in XCSoar default.xci are
@@ -61,8 +61,8 @@ const char Button_5_press_key = KEY_ESC;          // ESC
 const char Button_5_hold_key = 'Q';               // Q to quit XCSoar
 const char Joy_button_press_key = KEY_RETURN;     // Enter
 //         Joy_button_hold_key                    // switches between keyboard and mouse mode
-const char STF_switch_on_key = 'V';               // V for vario mode when switch is on
-const char STF_switch_off_key = 'S';              // S for STF mode when switch is off
+const char STF_Vario = 'V';               // V for vario mode when switch is on
+const char STF_SpeedToFly = 'S';              // S for STF mode when switch is off
 
 // define timing for buttons etc.
 const int Mouse_Move_Distance = 1;
@@ -78,9 +78,10 @@ boolean mouse_active = 0;
 boolean first_pressed = 1;
 int joy_key_counter = 0;
 
+char STF_key = STF_Vario; 
 
 // Create instances of PushButtons on digital pins
-PushButton STF_switch = PushButton(STF_switch_pin, ENABLE_INTERNAL_PULLUP);
+PushButton STF_button = PushButton(STF_button_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_up = PushButton(Joy_up_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_down = PushButton(Joy_down_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_left = PushButton(Joy_left_pin, ENABLE_INTERNAL_PULLUP);
@@ -91,10 +92,8 @@ PushButton Button_4 = PushButton(Button_4_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Button_5 = PushButton(Button_5_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_button = PushButton(Joy_button_pin, ENABLE_INTERNAL_PULLUP);
 
-
 void setup() {
-  STF_switch.onPress(onSTF_switch);
-  STF_switch.onRelease(onSTF_switch);
+  STF_button.onPress(onSTF_button);
   
   Joy_up.onRelease(onJoyRelease);
   Joy_down.onRelease(onJoyRelease);
@@ -124,7 +123,7 @@ void setup() {
 }
 
 void loop() {
-  STF_switch.update();
+  STF_button.update();
   Button_2.update();
   Button_3.update();
   Button_4.update();
@@ -184,9 +183,11 @@ void onJoyRelease(Button& btn){
   first_pressed = 1;
 }
 
-void onSTF_switch(Button& btn){
-  if(STF_switch.isPressed()) Keyboard.press(STF_switch_on_key);
+void onSTF_button(Button& btn){
+  if (STF_key == STF_Vario) 
+    STF_key = (STF_SpeedToFly);
   else
-  Keyboard.press(STF_switch_off_key);
+    STF_key = (STF_Vario); 
+  Keyboard.press(STF_key);
   Keyboard.releaseAll(); 
 }
