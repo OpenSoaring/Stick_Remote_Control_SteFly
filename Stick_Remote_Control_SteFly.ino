@@ -16,21 +16,18 @@
 #include <PushButton.h>
 #include <Bounce2.h>
 
-
-
 // define on which pins the buttons are connected
-
-//        Button_1_pin = N/A   // PTT switch
-const int Button_2_pin = 8;    // upper LH button
-const int Button_3_pin = 9;    // top button
-const int Button_4_pin = 15;   // upper RH button
-const int Button_5_pin = 14;   // lower RH button
-const int Joy_button_pin = 16; // joystick button
-const int Joy_up_pin = 10;
-const int Joy_down_pin = 7;
-const int Joy_left_pin = 2;
-const int Joy_right_pin = 21;
-const int STF_switch_pin = 4;  // STF switch 
+//        Button_1_pin = N/A  // PTT switch
+const int Button_2_pin = 14;  // upper LH button
+const int Button_3_pin = 9;   // top button
+const int Button_4_pin = 1;   // upper RH button
+const int Button_5_pin = 15;  // lower RH button
+const int Joy_button_pin = 6; // joystick button
+const int Joy_up_pin = 2;
+const int Joy_down_pin = 4;
+const int Joy_left_pin = 5;
+const int Joy_right_pin = 3;
+const int STF_switch_pin = 7; // STF switch 
 
 // define press (short press) and hold (long press) functions for each button
 // settings in XCSoar default.xci are
