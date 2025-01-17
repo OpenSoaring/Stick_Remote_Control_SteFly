@@ -47,7 +47,7 @@ const int STF_button_pin = 7;  // STF switch
 // settings in openvario.xci
 // V for vario mode
 // S for speed to fly mode
-// M for vario menu
+// M for vario menu (audio)
 // Q to quit
 
 
