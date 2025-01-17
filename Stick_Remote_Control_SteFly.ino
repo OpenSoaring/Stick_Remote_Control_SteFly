@@ -17,17 +17,16 @@
 #include <Bounce2.h>
 
 // define on which pins the buttons are connected
-//        Button_1_pin = N/A  // PTT switch
-const int Button_2_pin = 14;  // upper LH button
-const int Button_3_pin = 9;   // top button
-const int Button_4_pin = 1;   // upper RH button
-const int Button_5_pin = 15;  // lower RH button
-const int Joy_button_pin = 6; // joystick button
+const int Button_1_pin = 9;    // top left button
+const int Button_2_pin = 14;   // top right button
+const int Button_3_pin = 15;   // low right button
+//        Button_4_pin = N/A   // low left (PTT) button
+const int Joy_button_pin = 6;  // joystick button
 const int Joy_up_pin = 2;
 const int Joy_down_pin = 4;
 const int Joy_left_pin = 5;
 const int Joy_right_pin = 3;
-const int STF_button_pin = 7; // STF switch 
+const int STF_button_pin = 7;  // STF switch 
 
 // define press (short press) and hold (long press) functions for each button
 // settings in XCSoar default.xci are
@@ -50,19 +49,17 @@ const int STF_button_pin = 7; // STF switch
 // Q to quit
 
 
-//         Button_1 = N/A                         // PTT switch
+const char Button_1_press_key = 0;
+const char Button_1_hold_key = 0;
 const char Button_2_press_key = KEY_F1;           // F1 for QuickMenu
 const char Button_2_hold_key = 'M';               // M for vario menu
-const char Button_3_press_key = KEY_F3;           // F3 for checklist
-const char Button_3_hold_key = KEY_F2;            // F2 for analysis
-const char Button_4_press_key = KEY_F6;           // F6 for alternates
-const char Button_4_hold_key = KEY_F5;            // F5 for waypoints
-const char Button_5_press_key = KEY_ESC;          // ESC
-const char Button_5_hold_key = 'Q';               // Q to quit XCSoar
+const char Button_3_press_key = KEY_ESC;          // ESC
+const char Button_3_hold_key = 'Q';               // Q to quit XCSoar
+//         Button_4 = N/A                         // PTT switch
 const char Joy_button_press_key = KEY_RETURN;     // Enter
 //         Joy_button_hold_key                    // switches between keyboard and mouse mode
-const char STF_Vario = 'V';               // V for vario mode when switch is on
-const char STF_SpeedToFly = 'S';              // S for STF mode when switch is off
+const char STF_Vario = 'V';                       // V for vario mode when switch is on
+const char STF_SpeedToFly = 'S';                  // S for STF mode when switch is off
 
 // define timing for buttons etc.
 const int Mouse_Move_Distance = 1;
@@ -86,10 +83,10 @@ PushButton Joy_up = PushButton(Joy_up_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_down = PushButton(Joy_down_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_left = PushButton(Joy_left_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_right = PushButton(Joy_right_pin, ENABLE_INTERNAL_PULLUP);
+PushButton Button_1 = PushButton(Button_1_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Button_2 = PushButton(Button_2_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Button_3 = PushButton(Button_3_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Button_4 = PushButton(Button_4_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Button_5 = PushButton(Button_5_pin, ENABLE_INTERNAL_PULLUP);
+// PushButton Button_4 = PushButton(Button_4_pin, ENABLE_INTERNAL_PULLUP);
 PushButton Joy_button = PushButton(Joy_button_pin, ENABLE_INTERNAL_PULLUP);
 
 void setup() {
@@ -105,16 +102,14 @@ void setup() {
   Joy_left.onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
   Joy_right.onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
   
+  Button_1.onRelease(0,button_hold_threshold-1,onButtonReleased);
   Button_2.onRelease(0,button_hold_threshold-1,onButtonReleased);
   Button_3.onRelease(0,button_hold_threshold-1,onButtonReleased);
-  Button_4.onRelease(0,button_hold_threshold-1,onButtonReleased);
-  Button_5.onRelease(0,button_hold_threshold-1,onButtonReleased);
   Joy_button.onRelease(0,button_hold_threshold-1,onButtonReleased);
   
+  Button_1.onHold(button_hold_threshold,onButtonHeld);
   Button_2.onHold(button_hold_threshold,onButtonHeld);
   Button_3.onHold(button_hold_threshold,onButtonHeld);
-  Button_4.onHold(button_hold_threshold,onButtonHeld);
-  Button_5.onHold(button_hold_threshold,onButtonHeld);
   Joy_button.onHold(button_hold_threshold,onButtonHeld);
  
   Keyboard.begin();
@@ -124,10 +119,9 @@ void setup() {
 
 void loop() {
   STF_button.update();
+  Button_1.update();
   Button_2.update();
   Button_3.update();
-  Button_4.update();
-  Button_5.update();
   Joy_button.update();
   Joy_up.update();
   Joy_down.update();
@@ -136,10 +130,9 @@ void loop() {
 }
 
 void onButtonReleased(Button& btn){
+  if(btn.is(Button_1)) Keyboard.press(Button_1_press_key);
   if(btn.is(Button_2)) Keyboard.press(Button_2_press_key);
   if(btn.is(Button_3)) Keyboard.press(Button_3_press_key);
-  if(btn.is(Button_4)) Keyboard.press(Button_4_press_key);
-  if(btn.is(Button_5)) Keyboard.press(Button_5_press_key);
   if(btn.is(Joy_button)) 
     if(mouse_active) Mouse.click(MOUSE_LEFT);
     else Keyboard.press(Joy_button_press_key);
@@ -147,10 +140,9 @@ void onButtonReleased(Button& btn){
 }
 
 void onButtonHeld(Button& btn){
+  if(btn.is(Button_1)) Keyboard.press(Button_1_hold_key);
   if(btn.is(Button_2)) Keyboard.press(Button_2_hold_key);
   if(btn.is(Button_3)) Keyboard.press(Button_3_hold_key);
-  if(btn.is(Button_4)) Keyboard.press(Button_4_hold_key);
-  if(btn.is(Button_5)) Keyboard.press(Button_5_hold_key);
   if(btn.is(Joy_button)) mouse_active = !mouse_active;
   Keyboard.releaseAll();  
 } 
