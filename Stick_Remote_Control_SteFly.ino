@@ -49,15 +49,15 @@ const int STF_button_pin = 7;  // STF switch
 // Q to quit
 
 
-const char Button_1_press_key = 0;
-const char Button_1_hold_key = 0;
+const char Button_1_press_key = 0;                // this is the mouse switch button
+const char Button_1_hold_key = 0;                 // not used on SteFly now (2024-12-31)
 const char Button_2_press_key = KEY_F1;           // F1 for QuickMenu
 const char Button_2_hold_key = 'M';               // M for vario menu
 const char Button_3_press_key = KEY_ESC;          // ESC
 const char Button_3_hold_key = 'Q';               // Q to quit XCSoar
 //         Button_4 = N/A                         // PTT switch
 const char Joy_button_press_key = KEY_RETURN;     // Enter
-//         Joy_button_hold_key                    // switches between keyboard and mouse mode
+const char Joy_button_hold_key = 0;               // unused
 const char STF_Vario = 'V';                       // V for vario mode when switch is on
 const char STF_SpeedToFly = 'S';                  // S for STF mode when switch is off
 
@@ -110,7 +110,6 @@ void setup() {
   Button_1.onHold(button_hold_threshold,onButtonHeld);
   Button_2.onHold(button_hold_threshold,onButtonHeld);
   Button_3.onHold(button_hold_threshold,onButtonHeld);
-  Joy_button.onHold(button_hold_threshold,onButtonHeld);
  
   Keyboard.begin();
   Mouse.begin();
@@ -130,7 +129,8 @@ void loop() {
 }
 
 void onButtonReleased(Button& btn){
-  if(btn.is(Button_1)) Keyboard.press(Button_1_press_key);
+  if(btn.is(Button_1)) 
+      mouse_active = !mouse_active;
   if(btn.is(Button_2)) Keyboard.press(Button_2_press_key);
   if(btn.is(Button_3)) Keyboard.press(Button_3_press_key);
   if(btn.is(Joy_button)) 
@@ -140,10 +140,14 @@ void onButtonReleased(Button& btn){
 }
 
 void onButtonHeld(Button& btn){
-  if(btn.is(Button_1)) Keyboard.press(Button_1_hold_key);
-  if(btn.is(Button_2)) Keyboard.press(Button_2_hold_key);
-  if(btn.is(Button_3)) Keyboard.press(Button_3_hold_key);
-  if(btn.is(Joy_button)) mouse_active = !mouse_active;
+  if(btn.is(Button_1) && Button_1_hold_key)
+      Keyboard.press(Button_1_hold_key);
+  if(btn.is(Button_2) && Button_2_hold_key)
+      Keyboard.press(Button_2_hold_key);
+  if(btn.is(Button_3) && Button_3_hold_key)
+      Keyboard.press(Button_3_hold_key);
+  if(btn.is(Joy_button) && Joy_button_hold_key)
+      Keyboard.press(Joy_button_hold_key);
   Keyboard.releaseAll();  
 } 
 
