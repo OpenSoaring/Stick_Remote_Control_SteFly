@@ -2,7 +2,7 @@
 // hardware is just pushbuttons connected between pins of an Arduino Leonardo and Gnd
 // for each button press a keystroke or mouse action is sent
 // Button layout Stefly Remote (5 button type) as shown on http://www.openvario.org/doku.php?id=projects:remote_00:top 
-// additional Speed to Fly switch between Arduino pin 4 and GND
+// additional Speed to Fly switch or button between Arduino pin 7 and GND
 
 // uses libraries from
 // https://github.com/r89m/PushButton 
@@ -19,6 +19,9 @@
 #include "avr/wdt.h"
 
 #define VERBOSE  2
+// disable the next define if you have a BUTTON instead a TOGGLE SWITCH: 
+// #define USE_STF_SWITCH
+
 // define press (short press) and hold (long press) functions for each button
 // settings in XCSoar default.xci are
 // F1 QuickMenu
@@ -119,7 +122,12 @@ void wdtReset() {
 void setup() {
   Serial.begin(9600);
   watchdogInit();
+#ifdef USE_STF_SWITCH
+  button[btnSTF].onPress(onSTF_switch);
+  button[btnSTF].onRelease(onSTF_switch);
+#else
   button[btnSTF].onPress(onSTF_button);
+#endif
   
   for (int i=joyUp;i<=joyRight;i++) {
      button[i].onRelease(onJoyRelease);
@@ -278,8 +286,15 @@ void onJoyRelease(PushButton& btn){
   first_pressed = 1;
 }
 
+#ifdef USE_STF_SWITCH
+// use a SWITCH to enable Vario or Speed -To-fly mode
+void onSTF_switch(PushButton& btn){
+  if (button[btnSTF].isPressed()) 
+#else
+// use a BUTTON to switch between Vario or Speed -To-fly mode
 void onSTF_button(PushButton& btn){
   if (STF_key == event[btnSTF][KEY_LONG]) 
+#endif
     STF_key = (event[btnSTF][KEY_PRESSED]);
   else
     STF_key = (event[btnSTF][KEY_LONG]); 
