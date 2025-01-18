@@ -18,18 +18,7 @@
 
 #include "avr/wdt.h"
 
-// define on which pins the buttons are connected
-const int Button_1_pin = 9;    // top left button
-const int Button_2_pin = 14;   // top right button
-const int Button_3_pin = 15;   // low right button
-//        Button_4_pin = N/A   // low left (PTT) button
-const int Joy_button_pin = 6;  // joystick button
-const int Joy_up_pin = 2;
-const int Joy_down_pin = 4;
-const int Joy_left_pin = 5;
-const int Joy_right_pin = 3;
-const int STF_button_pin = 7;  // STF switch 
-
+#define VERBOSE  2
 // define press (short press) and hold (long press) functions for each button
 // settings in XCSoar default.xci are
 // F1 QuickMenu
@@ -51,24 +40,13 @@ const int STF_button_pin = 7;  // STF switch
 // Q to quit
 
 
-const char Button_1_press_key = 0;                // this is the mouse switch button
-const char Button_1_hold_key = 0;                 // not used on SteFly now (2024-12-31)
-const char Button_2_press_key = KEY_F1;           // F1 for QuickMenu
-const char Button_2_hold_key = 'M';               // M for vario menu
-const char Button_3_press_key = KEY_ESC;          // ESC
-const char Button_3_hold_key = 'Q';               // Q to quit XCSoar
-//         Button_4 = N/A                         // PTT switch
-const char Joy_button_press_key = KEY_RETURN;     // Enter
-const char Joy_button_hold_key = 0;               // unused
-const char STF_Vario = 'V';                       // V for vario mode when switch is on
-const char STF_SpeedToFly = 'S';                  // S for STF mode when switch is off
-
 // define timing for buttons etc.
 const int Mouse_Move_Distance = 1;
 const int joy_rebounce_interval = 3;
 const int joy_key_rebounce_threshold = 20;
 const int joy_key_first_pressed_threshold = 100;
-const int button_hold_threshold = 500;
+const int button_hold_threshold = 900;
+const int button_long_hold = 5000;  // = 5 seconds
 const int joy_hold_threshold = 1;
 //const int debounce_delay = 10;                   //Debounce delay in milliseconds, not used
 
@@ -76,23 +54,50 @@ const int joy_hold_threshold = 1;
 boolean mouse_active = 0;
 boolean first_pressed = 1;
 int joy_key_counter = 0;
+int joy_counter[10] = {0,0,0,0,0,0,0,0,0,0};
+int btn_timer[10] = {0,0,0,0,0,0,0,0,0,0};
 
 unsigned long timeNow = 0;
 unsigned long timeWDT = 0;
 
-char STF_key = STF_Vario; 
-
 // Create instances of PushButtons on digital pins
-PushButton STF_button = PushButton(STF_button_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Joy_up = PushButton(Joy_up_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Joy_down = PushButton(Joy_down_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Joy_left = PushButton(Joy_left_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Joy_right = PushButton(Joy_right_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Button_1 = PushButton(Button_1_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Button_2 = PushButton(Button_2_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Button_3 = PushButton(Button_3_pin, ENABLE_INTERNAL_PULLUP);
-// PushButton Button_4 = PushButton(Button_4_pin, ENABLE_INTERNAL_PULLUP);
-PushButton Joy_button = PushButton(Joy_button_pin, ENABLE_INTERNAL_PULLUP);
+enum {btnJoy, btnTopLeft, btnTopRight, btnBottomRight, btnBottomLeft, 
+      joyUp, joyDown, joyLeft, joyRight, btnSTF, btnSize};
+
+const uint8_t pullup = ENABLE_INTERNAL_PULLUP;
+PushButton button[] = {
+    { 6, pullup}, // btnJoy: joystick button
+    { 9, pullup}, // btnTopLeft: mouse switch (and 'P')
+    {14, pullup}, // btnTopRight: QuickMenu and AudioMenue
+    {15, pullup}, // btnBottomRight: ESC and 'Q'uit
+    { 0, pullup}, // btnBottomLeft: PTT -> not connected
+    { 2, pullup}, // joyUp
+    { 4, pullup}, // joyDown
+    { 5, pullup}, // joyLeft
+    { 3, pullup}, // joyRight
+    { 7, pullup}  // btnSTF
+};
+enum {JOY_KEY, JOY_X, JOY_Y};
+enum {KEY_PRESSED, KEY_LONG, KEY_VERYLONG};
+const int event[][3] = {
+   // short pressed    >= 1 Second           very long (not used up to now) 
+    { KEY_RETURN,      '>' /* 0 */,          0},                     // btnJoy: joystick button
+    { 0,               'P' /*KEY_F2*/,       0},                     // btnTopLeft: mouse switch (and 'P')
+    { KEY_F1,          'M',                  0},                     // btnTopRight: QuickMenu and AudioMenue
+    { KEY_ESC,         'Q',                  'X'},                   // btnBottomRight: ESC and 'Q'uit, or Shutdown
+    { 0,               0,                    0},                     // btnBottomLeft: PTT
+
+//   JOY_KEY           JOY_X                 JOY_Y                     
+    { KEY_UP_ARROW,    0,                    -Mouse_Move_Distance},  // joyUp
+    { KEY_DOWN_ARROW,  0,                    +Mouse_Move_Distance},  // joyDown
+    { KEY_LEFT_ARROW,  -Mouse_Move_Distance, 0},                     // joyLeft
+    { KEY_RIGHT_ARROW, +Mouse_Move_Distance, 0},                     // joyRight
+
+  //  Switch On        Switch Off
+    { 'V',             'S',                  0}                      // btnSTF
+};
+char STF_key = 'V'; 
+
 
 void watchdogInit() {                                         
         timeWDT = timeNow = millis();
@@ -103,7 +108,9 @@ void watchdogInit() {
 void wdtReset() {
     timeNow = millis();
     if (timeNow - timeWDT >= 450) {  // 2 in 1 second
+#if VERBOSE & 1        
         Serial.println(timeNow);
+#endif
         timeWDT = timeNow;
         wdt_reset();
     }
@@ -112,102 +119,170 @@ void wdtReset() {
 void setup() {
   Serial.begin(9600);
   watchdogInit();
-  STF_button.onPress(onSTF_button);
+  button[btnSTF].onPress(onSTF_button);
   
-  Joy_up.onRelease(onJoyRelease);
-  Joy_down.onRelease(onJoyRelease);
-  Joy_left.onRelease(onJoyRelease);
-  Joy_right.onRelease(onJoyRelease);
+  for (int i=joyUp;i<=joyRight;i++) {
+     button[i].onRelease(onJoyRelease);
+     button[i].onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
+  }
 
-  Joy_up.onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
-  Joy_down.onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
-  Joy_left.onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
-  Joy_right.onHoldRepeat(joy_hold_threshold, joy_rebounce_interval, onJoy);
+  button[btnJoy]        .onRelease(0,button_hold_threshold-1,onBtnReleasedJoy);
+  button[btnJoy]        .onRelease(button_hold_threshold,onReset);
   
-  Button_1.onRelease(0,button_hold_threshold-1,onButtonReleased);
-  Button_2.onRelease(0,button_hold_threshold-1,onButtonReleased);
-  Button_3.onRelease(0,button_hold_threshold-1,onButtonReleased);
-  Joy_button.onRelease(0,button_hold_threshold-1,onButtonReleased);
-  
-  Button_1.onHold(button_hold_threshold,onButtonHeld);
-  Button_2.onHold(button_hold_threshold,onButtonHeld);
-  Button_3.onHold(button_hold_threshold,onButtonHeld);
+//  button[btnTopLeft]    .onRelease(0,button_hold_threshold-1,onMouseMode);
+//  button[btnTopLeft]    .onRelease(button_hold_threshold,onButtonLong);
+
+  for (int i=btnTopRight;i<=btnBottomRight;i++) {
+    button[i].onRelease(0,button_hold_threshold-1,onButtonReleased);
+    button[i].onRelease(button_hold_threshold, button_long_hold-1,onButtonLong);
+    // button[i].onRelease(onButtonVeryLong);
+    button[i].onHold(button_long_hold, onButtonVeryLong);
+    // button[i].onRelease(button_long_hold,0xFFFF,onButtonVeryLong);
+  }
+
+//  button[btnBottomRight].onRelease(0,button_hold_threshold-1,onButtonReleased);
+
+  button[btnTopLeft]    .onRelease(0,button_hold_threshold-1,onMouseMode);  // overwrite onButtonReleased
  
   Keyboard.begin();
   Mouse.begin();
   joy_key_counter = 0;
+  for (int i=joyUp;i<=joyRight;i++)
+    joy_counter[i] = 0;
+
 }
 
 void loop() {
-  STF_button.update();
-  Button_1.update();
-  Button_2.update();
-  Button_3.update();
-  Joy_button.update();
-  Joy_up.update();
-  Joy_down.update();
-  Joy_left.update();
-  Joy_right.update();
+  for (int i=0;i<btnSize;i++)
+    button[i].update();
 
   wdtReset();
+  if (Serial.read() == 'v')
+    Serial.println("Version");
 }
 
-void onButtonReleased(Button& btn){
-  if(btn.is(Button_1)) 
-      mouse_active = !mouse_active;
-  if(btn.is(Button_2)) Keyboard.press(Button_2_press_key);
-  if(btn.is(Button_3)) Keyboard.press(Button_3_press_key);
-  if(btn.is(Joy_button)) 
-    if(mouse_active) Mouse.click(MOUSE_LEFT);
-    else Keyboard.press(Joy_button_press_key);
-  Keyboard.releaseAll();
+void onBtnPress(PushButton& btn) {
+  int index = &btn - button;
+  btn_timer[index] = millis();
+#if VERBOSE & 2        
+  Serial.print("Button Press (JOY): ");
+  Serial.print(index);
+  Serial.print(", ");
+  Serial.println(btn_timer[index]);
+#endif
+}
+void onBtnReleasedJoy(PushButton& btn){
+    if (mouse_active) 
+      Mouse.click(MOUSE_LEFT);
+    else {
+      if (event[0][KEY_PRESSED]) {
+        Keyboard.press(event[0][KEY_PRESSED]);
+        Keyboard.releaseAll();
+      }
+    }
 }
 
-void onButtonHeld(Button& btn){
-  if(btn.is(Button_1) && Button_1_hold_key)
-      Keyboard.press(Button_1_hold_key);
-  if(btn.is(Button_2) && Button_2_hold_key)
-      Keyboard.press(Button_2_hold_key);
-  if(btn.is(Button_3) && Button_3_hold_key)
-      Keyboard.press(Button_3_hold_key);
-  if(btn.is(Joy_button) && Joy_button_hold_key)
-      Keyboard.press(Joy_button_hold_key);
-  Keyboard.releaseAll();  
+void onMouseMode(PushButton& btn){
+    mouse_active = !mouse_active;
+    // Keyboard.press(event[btnTopLeft][KEY_PRESSED]);
+    // Keyboard.releaseAll();
+}
+void onButtonReleased(PushButton& btn){
+  int index = &btn - button;
+#if VERBOSE & 2        
+  Serial.print("Button Released: ");
+  Serial.print(index);
+  Serial.print(", ");
+  Serial.println(timeNow);
+#endif
+  if (event[index][KEY_PRESSED]) {
+    Keyboard.press(event[index][KEY_PRESSED]);
+    Keyboard.releaseAll();
+  }
+}
+
+void onReset(PushButton& btn){
+  if (event[0][KEY_LONG]) {
+    Keyboard.press(event[0][KEY_LONG]);
+    Keyboard.releaseAll();  
+  }
+  exit(1);
 } 
 
+void onBtnHeldTopLeft(PushButton& btn){
+  int index = &btn - button;
+#if VERBOSE & 2        
+  Serial.print("TopLeft Held: ");
+  Serial.print(index);
+  Serial.print(", ");
+  Serial.println(timeNow);
+#endif  
+  Keyboard.press(event[index][KEY_LONG]);
+  Keyboard.releaseAll();  
+} 
+void onButtonLong(PushButton& btn){
+  int index = &btn - button;
+#if VERBOSE & 2        
+  Serial.print("Button Held: ");
+  Serial.print(index);
+  Serial.print(", ");
+  Serial.println(timeNow);
+#endif  
+  if (event[index][KEY_LONG]) {
+    Keyboard.press(event[index][KEY_LONG]);
+    Keyboard.releaseAll();  
+  }
+} 
+void onButtonVeryLong(PushButton& btn){
+  int index = &btn - button;
+#if VERBOSE & 2        
+  Serial.print("Button Very Long: ");
+  Serial.print(index);
+  Serial.print(", ");
+  Serial.println(timeNow);
+#endif  
+  if (event[index][KEY_VERYLONG]) {
+    Keyboard.press(event[index][KEY_VERYLONG]);
+    Keyboard.releaseAll();  
+  } else if (event[index][KEY_LONG]) {
+    Keyboard.press(event[index][KEY_LONG]);
+    Keyboard.releaseAll();  
+  }
+} 
 
-void onJoy(Button& btn){
-  if(mouse_active && btn.isPressed()) {
-    if(btn.is(Joy_up)) Mouse.move(0, -Mouse_Move_Distance);
-    if(btn.is(Joy_down)) Mouse.move(0, Mouse_Move_Distance);
-    if(btn.is(Joy_left)) Mouse.move(-Mouse_Move_Distance, 0);
-    if(btn.is(Joy_right)) Mouse.move(Mouse_Move_Distance, 0);
+void arrowBtn(PushButton& btn, int id) {
+  if (!button[btnJoy].isPressed()) {
+    if (mouse_active && btn.isPressed()) {
+       Mouse.move(event[id][JOY_X], event[id][JOY_Y]);
+    }
+
+    if(!mouse_active && btn.isPressed() && joy_counter[id] == 5) {
+      Keyboard.press(event[id][JOY_KEY]);
+      Keyboard.releaseAll(); 
+    }
+    joy_counter[id]++;  // = joy_counter[id] + 1; 
+    if (first_pressed && joy_counter[id] > joy_key_first_pressed_threshold){
+      joy_counter[id] = 0;
+      first_pressed = 0;
+    }
+    if (!first_pressed && joy_counter[id] > joy_key_rebounce_threshold)
+        joy_counter[id] = 0;  
   }
-  if(!mouse_active && btn.isPressed() && joy_key_counter == 5) {
-    if(btn.is(Joy_up)) Keyboard.press(KEY_UP_ARROW);
-    if(btn.is(Joy_down)) Keyboard.press(KEY_DOWN_ARROW);
-    if(btn.is(Joy_left)) Keyboard.press(KEY_LEFT_ARROW);
-    if(btn.is(Joy_right)) Keyboard.press(KEY_RIGHT_ARROW);
-    Keyboard.releaseAll(); 
-  } 
-  joy_key_counter = joy_key_counter + 1;
-  if (first_pressed && joy_key_counter > joy_key_first_pressed_threshold){
-    joy_key_counter = 0;
-    first_pressed = 0;
-  }
-  if (!first_pressed && joy_key_counter > joy_key_rebounce_threshold)joy_key_counter = 0;  
 }
+void onJoy(PushButton& btn) { arrowBtn(btn, &btn - button);}
 
-void onJoyRelease(Button& btn){
+void onJoyRelease(PushButton& btn){
   joy_key_counter = 0;
+  for (int i=joyUp;i<=joyRight;i++)
+    joy_counter[i] = 0;
   first_pressed = 1;
 }
 
-void onSTF_button(Button& btn){
-  if (STF_key == STF_Vario) 
-    STF_key = (STF_SpeedToFly);
+void onSTF_button(PushButton& btn){
+  if (STF_key == event[btnSTF][KEY_LONG]) 
+    STF_key = (event[btnSTF][KEY_PRESSED]);
   else
-    STF_key = (STF_Vario); 
+    STF_key = (event[btnSTF][KEY_LONG]); 
   Keyboard.press(STF_key);
   Keyboard.releaseAll(); 
 }
