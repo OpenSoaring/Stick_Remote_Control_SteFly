@@ -37,7 +37,7 @@ the sketch uses libraries from
                        // Mouse moves at an increased speed after ~0.8 sec
                        // Version: v2.1
 // -----------------------------------------------------------
-#define VERSION_TYPE    VERSION_OLD  // OLD, NEW or EXT
+#define VERSION_TYPE    VERSION_NEW  // OLD, NEW or EXT
 // -----------------------------------------------------------
 #include <Mouse.h>
 #include <Keyboard.h>
